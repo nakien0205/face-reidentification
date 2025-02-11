@@ -5,8 +5,9 @@ import warnings
 import argparse
 import logging
 import numpy as np
-
-import onnxruntime
+import csv
+import datetime
+import atexit
 from typing import Union, List, Tuple
 from models import SCRFD, ArcFace
 from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
@@ -64,6 +65,12 @@ def parse_args():
         default="INFO",
         help="Logging level"
     )
+    parser.add_argument(
+        "--csv-path",
+        type=str,
+        default="attendance.csv",
+        help="Path to save attendance CSV file"
+    )
 
     return parser.parse_args()
 
@@ -76,33 +83,35 @@ def setup_logging(level: str) -> None:
 
 
 def build_targets(detector, recognizer, params: argparse.Namespace) -> List[Tuple[np.ndarray, str]]:
-    """
-    Build targets using face detection and recognition.
-
-    Args:
-        detector (SCRFD): Face detector model.
-        recognizer (ArcFaceONNX): Face recognizer model.
-        params (argparse.Namespace): Command line arguments.
-
-    Returns:
-        List[Tuple[np.ndarray, str]]: A list of tuples containing feature vectors and corresponding image names.
-    """
     targets = []
     for filename in os.listdir(params.faces_dir):
         name = filename[:-4]
         image_path = os.path.join(params.faces_dir, filename)
-
         image = cv2.imread(image_path)
         bboxes, kpss = detector.detect(image, max_num=1)
-
         if len(kpss) == 0:
             logging.warning(f"No face detected in {image_path}. Skipping...")
             continue
-
         embedding = recognizer(image, kpss[0])
         targets.append((embedding, name))
-
     return targets
+
+def save_attendance(csv_path: str, present_names: set) -> None:
+    """Lưu danh sách người có mặt vào file CSV."""
+    if not present_names:  # Không lưu nếu không có ai được nhận diện
+        return
+
+    file_exists = os.path.isfile(csv_path)  # Kiểm tra file đã tồn tại chưa
+    with open(csv_path, mode='a', newline='') as file:  # Mở file ở chế độ append
+        writer = csv.writer(file)
+        if not file_exists:
+            writer.writerow(["Name", "Status", "Timestamp"])  # Thêm header nếu file mới
+
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for name in present_names:
+            writer.writerow([name, "Present", now])
+
+    print(f"✅ Attendance saved successfully to {csv_path}")  # In thông báo khi lưu thành công
 
 
 def frame_processor(
@@ -111,7 +120,8 @@ def frame_processor(
     recognizer: ArcFace,
     targets: List[Tuple[np.ndarray, str]],
     colors: dict,
-    params: argparse.Namespace
+    params: argparse.Namespace,
+    present_names: set
 ) -> np.ndarray:
     """
     Process a video frame for face detection and recognition.
@@ -123,6 +133,7 @@ def frame_processor(
         targets (List[Tuple[np.ndarray, str]]): List of target feature vectors and names.
         colors (dict): Dictionary of colors for drawing bounding boxes.
         params (argparse.Namespace): Command line arguments.
+        present_names (set): Set to store recognized names.
 
     Returns:
         np.ndarray: The processed video frame.
@@ -144,6 +155,7 @@ def frame_processor(
         if best_match_name != "Unknown":
             color = colors[best_match_name]
             draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
+            present_names.add(best_match_name)  
         else:
             draw_bbox(frame, bbox, (255, 0, 0))
 
@@ -159,7 +171,7 @@ def main(params):
     targets = build_targets(detector, recognizer, params)
     colors = {name: (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)) for _, name in targets}
 
-    cap = cv2.VideoCapture(params.source)
+    cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         raise Exception("Could not open video or webcam")
 
@@ -167,14 +179,16 @@ def main(params):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    out = cv2.VideoWriter("output_video.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+    out = cv2.VideoWriter("output.mp4", cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+
+    present_names = set()  # Tạo tập hợp để lưu người có mặt
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        frame = frame_processor(frame, detector, recognizer, targets, colors, params)
+        frame = frame_processor(frame, detector, recognizer, targets, colors, params, present_names)
         out.write(frame)
         cv2.imshow("Frame", frame)
 
@@ -185,9 +199,14 @@ def main(params):
     out.release()
     cv2.destroyAllWindows()
 
+    save_attendance(params.csv_path, present_names)  # Lưu dữ liệu khi kết thúc
+
 
 if __name__ == "__main__":
     args = parse_args()
     if args.source.isdigit():
         args.source = int(args.source)
+
+    present_names = set()  # Biến lưu danh sách người có mặt
+    atexit.register(lambda: save_attendance(args.csv_path, present_names))  # Chỉ lưu khi có người
     main(args)
