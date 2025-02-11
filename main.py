@@ -19,13 +19,13 @@ def parse_args():
     parser.add_argument(
         "--det-weight",
         type=str,
-        default="./weights/det_10g.onnx",
+        default=r"D:\BTL\face-reidentification\weights\det_10g.onnx",
         help="Path to detection model"
     )
     parser.add_argument(
         "--rec-weight",
         type=str,
-        default="./weights/w600k_r50.onnx",
+        default=r"D:\BTL\face-reidentification\weights\w600k_r50.onnx",
         help="Path to recognition model"
     )
     parser.add_argument(
@@ -43,13 +43,13 @@ def parse_args():
     parser.add_argument(
         "--faces-dir",
         type=str,
-        default="./faces",
+        default=r"D:\BTL\face-reidentification\faces",
         help="Path to faces stored dir"
     )
     parser.add_argument(
         "--source",
         type=str,
-        default="./assets/in_video.mp4",
+        default=r"D:\BTL\face-reidentification\assets\duck.mp4",
         help="Video file or video camera source. i.e 0 - webcam"
     )
     parser.add_argument(
