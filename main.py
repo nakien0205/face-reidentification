@@ -11,6 +11,8 @@ import atexit
 from typing import Union, List, Tuple
 from models import SCRFD, ArcFace
 from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
+import pickle
+
 
 warnings.filterwarnings("ignore")
 
@@ -75,6 +77,74 @@ def parse_args():
     return parser.parse_args()
 
 
+def save_embeddings(targets, cache_file="embeddings.pkl"):
+    """Lưu embedding vào file để tránh tính toán lại."""
+    with open(cache_file, "wb") as f:
+        pickle.dump(targets, f)
+    logging.info(f"✅ Embeddings saved to {cache_file}")
+
+def load_embeddings(cache_file="embeddings.pkl"):
+    """Tải embedding từ file nếu có."""
+    if os.path.exists(cache_file):
+        with open(cache_file, "rb") as f:
+            targets = pickle.load(f)
+        logging.info(f"✅ Loaded embeddings from {cache_file}")
+        return targets
+    return None
+
+def build_targets(detector, recognizer, params: argparse.Namespace, cache_file="embeddings.pkl") -> List[Tuple[np.ndarray, str]]:
+    """Trích xuất embedding và lưu lại vào cache."""
+    # Kiểm tra nếu đã có file embeddings thì load lên luôn
+    cached_targets = load_embeddings(cache_file)
+    if cached_targets:
+        return cached_targets
+
+    targets = []
+    
+    if not os.path.isdir(params.faces_dir):
+        logging.error(f"Faces directory '{params.faces_dir}' does not exist.")
+        return targets
+
+    for class_name in os.listdir(params.faces_dir):
+        class_path = os.path.join(params.faces_dir, class_name)
+        if not os.path.isdir(class_path):
+            continue
+
+        for student_name in os.listdir(class_path):
+            student_path = os.path.join(class_path, student_name)
+            if not os.path.isdir(student_path):
+                continue
+
+            embeddings = []
+            
+            for filename in os.listdir(student_path):
+                image_path = os.path.join(student_path, filename)
+                image = cv2.imread(image_path)
+                if image is None:
+                    logging.warning(f"Could not read image {image_path}. Skipping...")
+                    continue
+
+                bboxes, kpss = detector.detect(image, max_num=1)
+                if len(kpss) == 0:
+                    logging.warning(f"No face detected in {image_path}. Skipping...")
+                    continue
+
+                embedding = recognizer(image, kpss[0])
+                embeddings.append(embedding)
+            
+            if embeddings:
+                mean_embedding = np.mean(embeddings, axis=0)
+                targets.append((mean_embedding, student_name))
+                logging.info(f"Registered {student_name} with {len(embeddings)} images.")
+            else:
+                logging.warning(f"No valid images found for {student_name}. Skipping...")
+    
+    # Lưu embeddings vào file
+    save_embeddings(targets, cache_file)
+    return targets
+
+
+
 def setup_logging(level: str) -> None:
     logging.basicConfig(
         level=getattr(logging, level.upper(), None),
@@ -82,19 +152,19 @@ def setup_logging(level: str) -> None:
     )
 
 
-def build_targets(detector, recognizer, params: argparse.Namespace) -> List[Tuple[np.ndarray, str]]:
-    targets = []
-    for filename in os.listdir(params.faces_dir):
-        name = filename[:-4]
-        image_path = os.path.join(params.faces_dir, filename)
-        image = cv2.imread(image_path)
-        bboxes, kpss = detector.detect(image, max_num=1)
-        if len(kpss) == 0:
-            logging.warning(f"No face detected in {image_path}. Skipping...")
-            continue
-        embedding = recognizer(image, kpss[0])
-        targets.append((embedding, name))
-    return targets
+# def build_targets(detector, recognizer, params: argparse.Namespace) -> List[Tuple[np.ndarray, str]]:
+#     targets = []
+#     for filename in os.listdir(params.faces_dir):
+#         name = filename[:-4]
+#         image_path = os.path.join(params.faces_dir, filename)
+#         image = cv2.imread(image_path)
+#         bboxes, kpss = detector.detect(image, max_num=1)
+#         if len(kpss) == 0:
+#             logging.warning(f"No face detected in {image_path}. Skipping...")
+#             continue
+#         embedding = recognizer(image, kpss[0])
+#         targets.append((embedding, name))
+    # return targets
 
 def save_attendance(csv_path: str, present_names: set) -> None:
     """Lưu danh sách người có mặt vào file CSV."""
@@ -200,6 +270,8 @@ def main(params):
     cv2.destroyAllWindows()
 
     save_attendance(params.csv_path, present_names)  # Lưu dữ liệu khi kết thúc
+
+
 
 
 if __name__ == "__main__":
