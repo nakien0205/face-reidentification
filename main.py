@@ -12,23 +12,22 @@ from typing import Union, List, Tuple
 from models import SCRFD, ArcFace
 from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
 import pickle
-
-
 warnings.filterwarnings("ignore")
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Face Detection-and-Recognition")
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    
     parser.add_argument(
         "--det-weight",
         type=str,
-        default=r"D:\BTL\face-reidentification\weights\det_10g.onnx",
+        default=os.path.join(base_dir, "weights", "det_10g.onnx"),
         help="Path to detection model"
     )
     parser.add_argument(
         "--rec-weight",
         type=str,
-        default=r"D:\BTL\face-reidentification\weights\w600k_r50.onnx",
+        default=os.path.join(base_dir, "weights", "w600k_r50.onnx"),
         help="Path to recognition model"
     )
     parser.add_argument(
@@ -46,13 +45,13 @@ def parse_args():
     parser.add_argument(
         "--faces-dir",
         type=str,
-        default=r"D:\BTL\face-reidentification\faces",
+        default=os.path.join(base_dir, "faces"),
         help="Path to faces stored dir"
     )
     parser.add_argument(
         "--source",
         type=str,
-        default=r"D:\BTL\face-reidentification\assets\duck.mp4",
+        default=os.path.join(base_dir, "assets", "duck.mp4"),
         help="Video file or video camera source. i.e 0 - webcam"
     )
     parser.add_argument(
@@ -70,11 +69,12 @@ def parse_args():
     parser.add_argument(
         "--csv-path",
         type=str,
-        default="attendance.csv",
+        default=os.path.join(base_dir, "attendance.csv"),
         help="Path to save attendance CSV file"
     )
-
+    
     return parser.parse_args()
+
 
 
 def save_embeddings(targets, cache_file="embeddings.pkl"):
@@ -217,7 +217,7 @@ def frame_processor(
         max_similarity = 0
         best_match_name = "Unknown"
         for target, name in targets:
-            similarity = compute_similarity(target, embedding)
+            similarity = compute_similarity(target, embedding) 
             if similarity > max_similarity and similarity > params.similarity_thresh:
                 max_similarity = similarity
                 best_match_name = name
@@ -270,8 +270,6 @@ def main(params):
     cv2.destroyAllWindows()
 
     save_attendance(params.csv_path, present_names)  # Lưu dữ liệu khi kết thúc
-
-
 
 
 if __name__ == "__main__":
