@@ -151,21 +151,6 @@ def setup_logging(level: str) -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-
-# def build_targets(detector, recognizer, params: argparse.Namespace) -> List[Tuple[np.ndarray, str]]:
-#     targets = []
-#     for filename in os.listdir(params.faces_dir):
-#         name = filename[:-4]
-#         image_path = os.path.join(params.faces_dir, filename)
-#         image = cv2.imread(image_path)
-#         bboxes, kpss = detector.detect(image, max_num=1)
-#         if len(kpss) == 0:
-#             logging.warning(f"No face detected in {image_path}. Skipping...")
-#             continue
-#         embedding = recognizer(image, kpss[0])
-#         targets.append((embedding, name))
-    # return targets
-
 def save_attendance(csv_path: str, present_names: set) -> None:
     """Lưu danh sách người có mặt vào file CSV."""
     if not present_names:  # Không lưu nếu không có ai được nhận diện
@@ -227,7 +212,8 @@ def frame_processor(
             draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
             present_names.add(best_match_name)  
         else:
-            draw_bbox(frame, bbox, (255, 0, 0))
+            draw_bbox_info(frame, bbox,similarity = 0,name = 'Unknow', color = (255, 0, 0))
+            
 
     return frame
 
