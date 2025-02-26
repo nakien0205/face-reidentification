@@ -16,17 +16,6 @@ reference_alignment = np.array(
 
 
 def estimate_norm(landmark, image_size=112):
-    """Estimate normalization transformation matrix for facial landmarks.
-
-    Args:
-        landmark (ndarray): Array of shape (5, 2) representing the coordinates of the facial landmarks.
-        image_size (int, optional): The size of the output image. Default is 112.
-
-    Returns:
-        tuple: A tuple containing:
-            - min_matrix (ndarray): The 2x3 transformation matrix for aligning the landmarks.
-            - min_index (int): The index of the reference alignment that resulted in the minimum error.
-    """
     assert landmark.shape == (5, 2)
     min_matrix = []
     min_index = []

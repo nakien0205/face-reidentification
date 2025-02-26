@@ -19,31 +19,34 @@ test_dataset = datasets.ImageFolder(root=r"D:\BTL\face-reidentification\faces\AI
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-# **BƯỚC 2: Định nghĩa mô hình ArcFace**
-class ArcFace(nn.Module):
-    def __init__(self, embedding_size=512, num_classes=10):
-        super(ArcFace, self).__init__()
+# **BƯỚC 2: Định nghĩa mô hình SCRFD**
+class SCRFD(nn.Module):
+    def __init__(self, num_classes=10):
+        super(SCRFD, self).__init__()
         self.backbone = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2, 2),
             nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
+            nn.MaxPool2d(2, 2),
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
             nn.MaxPool2d(2, 2)
         )
-        self.fc = nn.Linear(128 * 28 * 28, embedding_size)
-        self.classifier = nn.Linear(embedding_size, num_classes)
+        self.fc = nn.Linear(256 * 14 * 14, 512)  # Flatten đầu ra
+        self.classifier = nn.Linear(512, num_classes)
 
     def forward(self, x):
         x = self.backbone(x)
         x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        logits = self.classifier(x)
-        return logits, x  # Trả về cả logits (cho phân loại) và embedding
+        features = self.fc(x)
+        logits = self.classifier(features)
+        return logits, features  # Trả về logits và embeddings
 
 # Khởi tạo mô hình
 num_classes = len(train_dataset.classes)
-model = ArcFace(num_classes=num_classes)
+model = SCRFD(num_classes=num_classes)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 
@@ -107,7 +110,7 @@ for epoch in range(num_epochs):
           f"Epoch Time: {epoch_time:.2f}s")
 
 # **BƯỚC 5: Lưu mô hình sau khi huấn luyện**
-model_path = "arcface_trained.pth"
+model_path = "scrfd_trained.pth"
 torch.save(model.state_dict(), model_path)
 total_train_time = time.time() - total_start_time  # Tổng thời gian huấn luyện
 print(f"✅ Mô hình đã được lưu tại {model_path}")
