@@ -1,15 +1,24 @@
 import numpy as np
 import cv2
 import keras
-# Load mô hình đã train
-model = keras.models.load_model(r"D:\Python\Projects\face-reidentification\liveness_detect\model_1.h5")
+import os
+
+model_path = os.path.join(os.path.dirname(__file__), "liveness_plus.h5")
+
+model = keras.models.load_model(model_path)
+
 
 # Hàm dự đoán ảnh
 def predict_image(image):
-    if isinstance(image, np.ndarray):
-        image = cv2.resize(image, (128, 128))
-        image = image / 255.0
-        image = np.expand_dims(image, axis=0)
+    if image is None or not isinstance(image, np.ndarray) or image.size == 0:
+        print("Warning: Invalid image received in predict_image()")
+        return None  # Trả về None để tránh lỗi
 
-        prediction = model.predict(image)
-        return "Fake" if prediction < 0.5 else "Real"
+    # Resize ảnh
+    image = cv2.resize(image, (128, 128))
+    image = image / 255.0
+    image = np.expand_dims(image, axis=0)
+
+    # Dự đoán
+    prediction = model.predict(image)
+    return "Fake" if prediction < 0.5 else "Real"
