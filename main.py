@@ -203,40 +203,31 @@ def frame_processor(
         *bbox, conf_score = bbox.astype(np.int32)
         embedding = recognizer(frame, kps)
 
+        # First check if face is real
+        face_crop = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+        liveness_result = predict_image(face_crop)
 
+        if liveness_result == "Fake":
+            # Draw red box for fake face
+            draw_bbox_info(frame, bbox, similarity=0, name="Fake", color=(0, 0, 255))
+            continue
+
+        # Only process real faces for recognition
         max_similarity = 0
         best_match_name = "Unknown"
         for target, name in targets:
-            similarity = compute_similarity(target, embedding) 
+            similarity = compute_similarity(target, embedding)
             if similarity > max_similarity and similarity > params.similarity_thresh:
                 max_similarity = similarity
                 best_match_name = name
 
-        # face_crop = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
-        # is_fake = predict_image(face_crop)
-        # if predict_image(is_fake) == 'Fake':
-        #     draw_bbox_info(frame, bbox, similarity=0, name=is_fake, color=(255, 0, 0))
-        #     best_match_name = is_fake
-        #
-        #     if best_match_name != "Unknown":
-        #         color = colors[best_match_name]
-        #         draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
-        #         present_names.add(best_match_name)
-        #     else:
-        #         draw_bbox_info(frame, bbox, similarity=0, name='Unknown', color=(255, 0, 0))
-
-        face_crop = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
-        is_fake = predict_image(face_crop)
-        if predict_image(is_fake) == 'Fake':
-            draw_bbox_info(frame, bbox, similarity=0, name='Fake', color=(255, 0, 0))
+        # Draw results
+        if best_match_name != "Unknown":
+            color = colors[best_match_name]
+            draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
+            present_names.add(best_match_name)
         else:
-            if best_match_name != "Unknown":
-                color = colors[best_match_name]
-                draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
-                present_names.add(best_match_name)
-            else:
-                draw_bbox_info(frame, bbox, similarity=0, name='Unknown', color=(255, 0, 0))
-            
+            draw_bbox_info(frame, bbox, similarity=0, name="Unknown", color=(255, 0, 0))
 
     return frame
 
