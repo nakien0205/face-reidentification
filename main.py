@@ -8,9 +8,10 @@ import numpy as np
 import csv
 import datetime
 import atexit
-from typing import Union, List, Tuple
+from typing import List, Tuple
 from models import SCRFD, ArcFace
-from utils.helpers import compute_similarity, draw_bbox_info, draw_bbox
+from utils.helpers import compute_similarity, draw_bbox_info
+from liveness_detect.FDM import predict_image
 import pickle
 warnings.filterwarnings("ignore")
 
@@ -129,6 +130,8 @@ def build_targets(detector, recognizer, params: argparse.Namespace, cache_file="
                     logging.warning(f"No face detected in {image_path}. Skipping...")
                     continue
 
+
+
                 embedding = recognizer(image, kpss[0])
                 embeddings.append(embedding)
             
@@ -195,9 +198,11 @@ def frame_processor(
     """
     bboxes, kpss = detector.detect(frame, params.max_num)
 
+
     for bbox, kps in zip(bboxes, kpss):
         *bbox, conf_score = bbox.astype(np.int32)
         embedding = recognizer(frame, kps)
+
 
         max_similarity = 0
         best_match_name = "Unknown"
@@ -207,12 +212,30 @@ def frame_processor(
                 max_similarity = similarity
                 best_match_name = name
 
-        if best_match_name != "Unknown":
-            color = colors[best_match_name]
-            draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
-            present_names.add(best_match_name)  
+        # face_crop = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+        # is_fake = predict_image(face_crop)
+        # if predict_image(is_fake) == 'Fake':
+        #     draw_bbox_info(frame, bbox, similarity=0, name=is_fake, color=(255, 0, 0))
+        #     best_match_name = is_fake
+        #
+        #     if best_match_name != "Unknown":
+        #         color = colors[best_match_name]
+        #         draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
+        #         present_names.add(best_match_name)
+        #     else:
+        #         draw_bbox_info(frame, bbox, similarity=0, name='Unknown', color=(255, 0, 0))
+
+        face_crop = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
+        is_fake = predict_image(face_crop)
+        if predict_image(is_fake) == 'Fake':
+            draw_bbox_info(frame, bbox, similarity=0, name='Fake', color=(255, 0, 0))
         else:
-            draw_bbox_info(frame, bbox,similarity = 0,name = 'Unknow', color = (255, 0, 0))
+            if best_match_name != "Unknown":
+                color = colors[best_match_name]
+                draw_bbox_info(frame, bbox, similarity=max_similarity, name=best_match_name, color=color)
+                present_names.add(best_match_name)
+            else:
+                draw_bbox_info(frame, bbox, similarity=0, name='Unknown', color=(255, 0, 0))
             
 
     return frame
