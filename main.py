@@ -206,13 +206,15 @@ def frame_processor(
         # First check if face is real
         face_crop = frame[bbox[1]:bbox[3], bbox[0]:bbox[2]]
         liveness_result = predict_image(face_crop)
-
+        if face_crop is not None and face_crop.size > 0:
+            liveness_result = predict_image(face_crop)
+        else:
+            liveness_result = None  # Không có khuôn mặt thì không dự đoán
         if liveness_result == "Fake":
             # Draw red box for fake face
             draw_bbox_info(frame, bbox, similarity=0, name="Fake", color=(0, 0, 255))
             continue
 
-        # Only process real faces for recognition
         max_similarity = 0
         best_match_name = "Unknown"
         for target, name in targets:
